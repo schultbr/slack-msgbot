@@ -4,16 +4,14 @@ import json
 from slackclient import SlackClient
 
 # TODO: Restructure the globals and __main__ portion of this file
-# into classes and object instantiation. Make everything cleaner.
-
+# into classes and object instantiation.  Make everything cleaner.
 class MsgBotUserConfig(object):
-    def __init__(self, bot_client, cfg_filename = os.getcwd() + os.path.normpath('/msgbotuserconfig.json')):
+    def __init__(self, bot_client, cfg_filename=os.getcwd() + os.path.normpath('/msgbotuserconfig.json')):
         self._template = {
             'color'  : '0000ff', # default Blue
             'session': None,
         }
-        self._valid_config_options = [
-            'token',
+        self._valid_config_options = ['token',
             'fallback',
             'color',
             'thumb_url',
@@ -22,12 +20,11 @@ class MsgBotUserConfig(object):
             'image_url',
             'footer',
             'footer_icon',
-            'ts'
-        ]
+            'ts']
 
         self._bot_client = bot_client
 
-        # Try to open the config file. If it fails, create an empty config
+        # Try to open the config file.  If it fails, create an empty config
         try:
             with open(cfg_filename) as cfg_file:
                 self._config = json.load(cfg_file)
@@ -52,15 +49,17 @@ class MsgBotUserConfig(object):
         s += '= User Configuration\n'
         s += '========================================\n'
         for user_id in self._config:
-            username = (u.name for u in self._bot_client.server.users if user_id==u.id).next()
+            username = (u.name for u in self._bot_client.server.users if user_id == u.id).next()
             s += '  {0} ({1})\n'.format(user_id, username)
             for key in self._config[user_id]:
                 s += '    `- {0}: {1}\n'.format(key, self._config[user_id][key])
         s += '\n'
         return s
 
-    # If you need access to the underlying dictionary, use the property 'config'
-    # Otherwise, the individual's config dictionaries are accessible via __getitem__
+    # If you need access to the underlying dictionary, use the property
+    # 'config'
+    # Otherwise, the individual's config dictionaries are accessible via
+    # __getitem__
     @property
     def config(self):
         return self._config
@@ -95,8 +94,16 @@ class MsgBotUserConfig(object):
         return True
 
 # msgbot's ID as an environment variable
-BOT_ID = os.environ.get("BOT_ID")
-BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
+BOT_ID = SLACK_BOT_ID
+BOT_TOKEN = SLACK_BOT_TOKEN
+BOT_KEYPHRASE = SLACK_BOT_KEYPHRASE
+
+if not BOT_ID:
+    BOT_ID = os.environ.get("BOT_ID")
+
+if not BOT_TOKEN:
+    BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
+
 botsc = SlackClient(BOT_TOKEN)
 user_config = MsgBotUserConfig(botsc)
 
@@ -115,8 +122,7 @@ def attempt_postMessage(user, channel, att):
         type = 'message',
         channel = channel,
         as_user = True,
-        attachments = json.dumps(att)
-    )
+        attachments = json.dumps(att))
 
 def handle_message(msg, user, ts, channel):
     """
@@ -162,40 +168,44 @@ def handle_message(msg, user, ts, channel):
         if user_config.HandleDelete(user, opt[1]):
             attempt_delete(user, ts, channel)
         return
-    
+
     # Check for '/load'
     if msg.startswith('/load'):
         try:
             user_config[user] = json.load(msg)
-            
-            #if we got here, the json.load call worked so delete the message and cut out.
+
+            #if we got here, the json.load call worked so delete the message
+            #and cut out.
             attempt_delete(user, ts, channel)
 
             return
         except Exception as ex:
-            #if we failed, go ahead and usurp the message and drop down into printing it below
+            #if we failed, go ahead and usurp the message and drop down into
+            #printing it below
             msg = "Unable to load configuration from JSON.\nEnsure valid JSON before trying again"
 
-    # Check for '/print' - if exists, throw away original message and replace with string dump of current config
+    # Check for '/print' - if exists, throw away original message and replace
+    # with string dump of current config
     if msg.startswith('/print'):
-        msg = "" #clear out current msg param so we can pass it along into the normal message display below
+        msg = "" #clear out current msg param so we can pass it along into the normal message
+                 #display below
         for key in user_config[user]:
             if key in ['token', 'session']: #don't print these
                 continue
-            
-            #add a formatted line to the current message with the current config key and it's value
-            msg.join(key, ": ", user_config[user][key], "\n") 
 
-    # No config, so this is a normal message that should be formatted (or the result of a /print)
+            #add a formatted line to the current message with the current
+            #config key and it's value
+            msg.join(key, ": ", user_config[user][key], "\n")
+
+    # No config, so this is a normal message that should be formatted (or the
+    # result of a /print)
     fb = user_config[user].get('fallback')
     if not fb:
         fb = msg
-    att = [
-        {
+    att = [{
         'text': msg,
         'fallback': fb,
-        },
-    ]
+        },]
     for key in user_config[user]:
         if key in ['session']:
             continue
@@ -206,7 +216,6 @@ def handle_message(msg, user, ts, channel):
 
     attempt_postMessage(user, channel, att)
 
-
 def parse_slack_output(slack_rtm_output):
     """
         The Slack Real Time Messaging API is an events firehose.
@@ -216,8 +225,8 @@ def parse_slack_output(slack_rtm_output):
     output_list = slack_rtm_output
     if output_list and len(output_list) > 0:
         for output in output_list:
-            if output and 'text' in output and output['text'].startswith('msgbot'):
-                username = (u.name for u in botsc.server.users if output['user']==u.id).next()
+            if output and 'text' in output and output['text'].startswith(BOT_KEYPHRASE):
+                username = (u.name for u in botsc.server.users if output['user'] == u.id).next()
                 print '<{0}> {1}: {2}'.format(output['channel'], username, output['text'].encode('utf-8'))
                 # return text after the msgbot text, leading whitespace removed
                 return output['text'][6:].strip(),\
@@ -225,7 +234,6 @@ def parse_slack_output(slack_rtm_output):
                        output['ts'],\
                        output['channel']
     return None, None, None, None
-
 
 if __name__ == "__main__":
     READ_WEBSOCKET_DELAY = 1 # 1 second delay between reading from firehose
