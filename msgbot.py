@@ -145,6 +145,9 @@ def handle_message(msg, user, ts, channel):
                 json.dump(d, f)
         except Exception as e:
             print 'Error saving configuration: {0}'.format(e)
+        
+        attempt_delete(user, ts, channel) 
+        return
 
     # Check for '/config'
     if msg.startswith('/config'):
@@ -195,7 +198,7 @@ def handle_message(msg, user, ts, channel):
 
             #add a formatted line to the current message with the current
             #config key and it's value
-            msg.join(key, ": ", user_config[user][key], "\n")
+            msg += ''.join([key, ": ", user_config[user][key], "\n"])
 
     # No config, so this is a normal message that should be formatted (or the
     # result of a /print)
@@ -229,7 +232,7 @@ def parse_slack_output(slack_rtm_output):
                 username = (u.name for u in botsc.server.users if output['user'] == u.id).next()
                 print '<{0}> {1}: {2}'.format(output['channel'], username, output['text'].encode('utf-8'))
                 # return text after the msgbot text, leading whitespace removed
-                return output['text'][6:].strip(),\
+                return output['text'][len(BOT_KEYPHRASE):].strip(),\
                        output['user'],\
                        output['ts'],\
                        output['channel']
